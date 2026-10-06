@@ -49,7 +49,19 @@ public class DownloadApkThread implements Runnable {
         this.mHashMap = mHashMap;
         this.mHandler = mHandler;
         this.authentication = new AuthenticationOptions(options);
-        this.mSavePath = Environment.getExternalStorageDirectory() + "/" + "download"; // SD Path
+
+        // App-specific external dir: writable on every API level without
+        // WRITE_EXTERNAL_STORAGE. Writing to the public Download folder fails with
+        // EACCES once WRITE_EXTERNAL_STORAGE is capped (maxSdkVersion) or scoped
+        // storage is enforced, and the update silently hangs.
+        File externalFilesDir = mContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        if (externalFilesDir != null) {
+            this.mSavePath = externalFilesDir.getAbsolutePath();
+        } else {
+            this.mSavePath = mContext.getFilesDir().getAbsolutePath();
+        }
+        LOG.d(TAG, "APK will be saved to: " + this.mSavePath);
+
         this.downloadHandler = new DownloadHandler(mContext, mProgress, mDownloadDialog, this.mSavePath, mHashMap);
     }
 
@@ -113,6 +125,11 @@ public class DownloadApkThread implements Runnable {
                 }else{
                     proceed = true;
                 }
+
+                if (!proceed) {
+                    LOG.e(TAG, "downloadAndInstall aborted, statusCode:" + statusCode);
+                    notifyFailure("HTTP " + statusCode);
+                }
                 
 
                 if(proceed){
@@ -126,7 +143,7 @@ public class DownloadApkThread implements Runnable {
                     File file = new File(mSavePath);
                     // 判断文件目录是否存在
                     if (!file.exists()) {
-                        file.mkdir();
+                        file.mkdirs();
                     }
                     File apkFile = new File(mSavePath, mHashMap.get("name")+".apk");
                     FileOutputStream fos = new FileOutputStream(apkFile);
@@ -161,12 +178,32 @@ public class DownloadApkThread implements Runnable {
 
 
                 
+            } else {
+                LOG.e(TAG, "downloadAndInstall aborted, external storage not mounted");
+                notifyFailure("external storage not mounted");
             }
         } catch (MalformedURLException e) {
-            e.printStackTrace();
+            LOG.e(TAG, "downloadAndInstall malformed URL", e);
+            notifyFailure("malformed URL: " + e.getMessage());
         } catch (IOException e) {
-            e.printStackTrace();
+            // Includes EACCES on the APK file: never swallow it, or the download
+            // dialog stays up forever with no way back.
+            LOG.e(TAG, "downloadAndInstall failed", e);
+            notifyFailure(e.toString());
         }
 
+    }
+
+    /**
+     * Tear down the download dialog and surface the error to the JS callback
+     * instead of leaving the update stuck. The reason rides along as msg.obj so it
+     * reaches JS - LOG only goes to logcat, which is gone by the time anyone asks.
+     */
+    private void notifyFailure(String reason) {
+        if (cancelUpdate) {
+            return;
+        }
+        downloadHandler.obtainMessage(Constants.DOWNLOAD_FAIL, reason).sendToTarget();
+        mHandler.obtainMessage(Constants.DOWNLOAD_FAIL, reason).sendToTarget();
     }
 }

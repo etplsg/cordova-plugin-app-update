@@ -59,6 +59,11 @@ public class DownloadHandler extends Handler {
                 // 安装文件
                 installApk();
                 break;
+            case Constants.DOWNLOAD_FAIL:
+                if (mDownloadDialog != null && mDownloadDialog.isShowing()) {
+                    mDownloadDialog.dismiss();
+                }
+                break;
             default:
                 break;
         }

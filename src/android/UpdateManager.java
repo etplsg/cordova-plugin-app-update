@@ -96,6 +96,11 @@ public class UpdateManager {
                 case Constants.DOWNLOAD_FINISH:
                     isDownloading = false;
                     break;
+                case Constants.DOWNLOAD_FAIL:
+                    isDownloading = false;
+                    callbackContext.error(Utils.makeJSON(Constants.DOWNLOAD_FAIL,
+                            msg.obj != null ? "download failed: " + msg.obj : "download failed"));
+                    break;
                 case Constants.VERSION_UPDATING:
                     callbackContext.success(Utils.makeJSON(Constants.VERSION_UPDATING, "success, version updating."));
                     break;

@@ -10,6 +10,8 @@ public interface Constants {
     int DOWNLOAD_FINISH = 2;
     /* 点击开始下载按钮*/
     int DOWNLOAD_CLICK_START = 3;
+    /* Download failed (write error, network drop, storage unavailable) */
+    int DOWNLOAD_FAIL = 4;
 
     /**
      * 对比版本号
